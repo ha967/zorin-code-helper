@@ -1,0 +1,53 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+description = 'zorin-code-helper'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// 让 javac 保留方法参数名（-parameters）。
+// 这样 langchain4j 生成的工具定义里参数名是 city，而不是无意义的 arg0，模型调用会更准。
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs.add('-parameters')
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'dev.langchain4j:langchain4j-community-dashscope-spring-boot-starter:1.1.0-beta7'
+    implementation 'dev.langchain4j:langchain4j:1.1.0'
+    implementation 'dev.langchain4j:langchain4j-mcp:1.1.0-beta7'
+    implementation 'org.jsoup:jsoup:1.20.1'
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testCompileOnly 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+// Windows 下 JVM 的 stdout/stderr 默认跟随系统代码页（中文系统为 GBK），
+// 而终端（Git Bash / VS Code）按 UTF-8 解码，中文日志就会乱码。
+// 显式指定 UTF-8 输出，与 IDEA 控制台的行为保持一致。
+def utf8Args = ['-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8']
+
+tasks.named('test') {
+    useJUnitPlatform()
+    jvmArgs utf8Args
+}
+
+tasks.named('bootRun') {
+    jvmArgs utf8Args
+}

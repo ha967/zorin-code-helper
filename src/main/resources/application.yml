@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: zorin-code-helper
+  profiles:
+    active: local
+
+# 会话记忆的持久化目录（相对于启动应用时的工作目录）
+app:
+  chat-memory:
+    dir: ./data/chat-memory
