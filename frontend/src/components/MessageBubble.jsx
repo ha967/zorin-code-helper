@@ -1,3 +1,5 @@
+import MarkdownContent from './MarkdownContent'
+
 export default function MessageBubble({ message }) {
   const isUser = message.role === 'user'
   const isThinking = !isUser && message.status === 'streaming' && !message.content
@@ -9,15 +11,17 @@ export default function MessageBubble({ message }) {
       </div>
 
       <div className="bubble-body">
-        <div className="bubble">
+        <div className={`bubble ${isUser ? '' : 'bubble--markdown'}`}>
           {isThinking ? (
             <span className="typing" aria-label="正在生成">
               <i />
               <i />
               <i />
             </span>
-          ) : (
+          ) : isUser ? (
             <div className="bubble-text">{message.content}</div>
+          ) : (
+            <MarkdownContent content={message.content} />
           )}
 
           {!isUser && message.status === 'streaming' && message.content && (

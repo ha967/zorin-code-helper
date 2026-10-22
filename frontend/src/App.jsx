@@ -1,15 +1,19 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import ChatHeader from './components/ChatHeader'
 import ChatInput from './components/ChatInput'
 import MessageList from './components/MessageList'
 import { useChat } from './hooks/useChat'
-import { createSessionId } from './utils/session'
+import { createSessionId, rememberSessionId, resolveSessionId } from './utils/session'
 
 export default function App() {
-  // 进入页面即生成一个会话 id，用于区分不同会话（后端按 memoryId 隔离记忆）
-  const [sessionId, setSessionId] = useState(createSessionId)
+  // 优先恢复地址栏 / localStorage 里的会话，找不到才新建
+  const [sessionId, setSessionId] = useState(resolveSessionId)
   const [draft, setDraft] = useState('')
   const { messages, isStreaming, send, stop, clear } = useChat(sessionId)
+
+  useEffect(() => {
+    rememberSessionId(sessionId)
+  }, [sessionId])
 
   const handleSend = useCallback(
     (text) => {

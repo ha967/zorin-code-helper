@@ -2,7 +2,6 @@ package com.example.zorincodehelper.ai;
 
 import com.example.zorincodehelper.ai.tools.TodayWeatherTool;
 //import dev.langchain4j.mcp.McpToolProvider;
-import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -36,19 +35,17 @@ public class AiCodeHelperServiceFactory {
 
     @Bean
     public AiCodeHelperService aiCodeHelperService() {
-        // 会话记忆，默认存储在内存中
-        ChatMemory chatMemoryDefault = MessageWindowChatMemory.withMaxMessages(10);
-        // 会话记忆：保留最近 10 条消息，并通过 FileChatMemoryStore 持久化到磁盘
-        ChatMemory chatMemory = MessageWindowChatMemory.builder()
-                .id("default")
-                .maxMessages(10)
-                .chatMemoryStore(fileChatMemoryStore)
-                .build();
+        // 每个 memoryId 一份记忆：保留最近 10 条消息，并通过 FileChatMemoryStore 持久化到磁盘。
+        // 注意：chatMemoryProvider 会覆盖 chatMemory（LangChain4j 1.1.0），
+        // 所以持久化只在这里配置，不要再额外调用 .chatMemory(...)。
         return AiServices.builder(AiCodeHelperService.class)
                 .chatModel(qwenChatModel)
                 .streamingChatModel(qwenStreamingChatModel) // 流式输出
-                .chatMemory(chatMemoryDefault)
-                .chatMemoryProvider(memoryId -> MessageWindowChatMemory.withMaxMessages(10)) // 每个会话独立存储
+                .chatMemoryProvider(memoryId -> MessageWindowChatMemory.builder()
+                        .id(memoryId)
+                        .maxMessages(10)
+                        .chatMemoryStore(fileChatMemoryStore)
+                        .build())
                 // .contentRetriever(contentRetriever) // RAG检索增强生成
                 .tools(todayWeatherTool) // 注册工具，让大模型可以调用 getTodayWeather 等方法
 //                .toolProvider(mcpToolProvider) // 注册MCP工具，让大模型可以调用MCP服务提供的工具

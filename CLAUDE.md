@@ -42,11 +42,17 @@ Start the backend first, then the frontend. The Vite dev server proxies `/api` t
   - `embedding-model` (`text-embedding-v4`) — required by `RagConfig`, which builds its `ContentRetriever` eagerly at startup
 - **Spring Boot 4 naming:** the web dependency is `spring-boot-starter-webmvc` and the test starter is `spring-boot-starter-webmvc-test` (they replaced `-web` / `-test`); use the `-webmvc` names when adding dependencies.
 - **Lombok** is wired (`compileOnly` + `annotationProcessor`), so `@Data`/`@Builder`/`@Slf4j` need no extra setup.
-- `app.chat-memory.dir` (default `./data/chat-memory`, set in `application.yml`) is the directory `FileChatMemoryStore` uses; `data/` is gitignored. See the memory caveat below — nothing currently writes there.
+- `app.chat-memory.dir` (default `./data/chat-memory`, set in `application.yml`) is the directory `FileChatMemoryStore` uses; `data/` is gitignored. Each session is persisted as `<memoryId>.json` and survives restarts.
+- **Jackson:** Spring Boot 4 auto-configures **Jackson 3** (`tools.jackson.databind.ObjectMapper`), while LangChain4j still brings Jackson 2 for its own serialization. Inject the `tools.jackson` mapper when serializing app payloads (the SSE frames use it); do not expect a `com.fasterxml.jackson.databind.ObjectMapper` bean.
 
 ## Backend Architecture
 
-`AiController` exposes `GET /ai/chat?memoryId=<int>&message=<string>`, producing `Flux<ServerSentEvent<String>>` from `AiCodeHelperService.chatStream(memoryId, message)`; `CorsConfig` opens `/**` to all origins.
+`AiController` exposes:
+
+- `POST /ai/chat` (body `{"memoryId": <int>, "message": "<string>"}`), returning `200 text/event-stream` with `Flux<String>` JSON frames;
+- `GET /ai/history?memoryId=<int>` and `DELETE /ai/history?memoryId=<int>` for restoring / clearing a session.
+
+`CorsConfig` opens `/**` to all origins. `GlobalExceptionHandler` turns `IllegalArgumentException` into `400 {"code","message"}` for the non-streaming endpoints.
 
 Two coexisting LangChain4j integration styles live in `com.example.zorincodehelper.ai`:
 
@@ -57,13 +63,13 @@ The persona exists in two places (inline `SYSTEM_MESSAGE` in `AiCodeHelper`, `sy
 
 Bean wiring: the DashScope starter auto-configures `qwenChatModel` and `qwenStreamingChatModel` (conditional on `api-key`), and both injection points use `@Resource` field-name injection — keep those field names, and do not add a second `ChatModel`/`StreamingChatModel` bean or wiring becomes ambiguous.
 
-### Chat memory: the file store is currently inactive
+### Chat memory: persisted per `memoryId`
 
-`AiCodeHelperServiceFactory` passes both `.chatMemory(file-backed, id "default")` and then `.chatMemoryProvider(memoryId -> MessageWindowChatMemory.withMaxMessages(10))`. In LangChain4j 1.1.0 the provider call replaces the memory service (`AiServiceContext.initChatMemories`), so **the provider wins for every method**: each `memoryId` gets its own in-memory 10-message window, calls without `@MemoryId` share the id `"default"`, `FileChatMemoryStore` is never called, and history does **not** survive a restart. To actually get persistence, drop the `chatMemoryProvider` or make it return file-store-backed memories.
+`AiCodeHelperServiceFactory` configures **only** `.chatMemoryProvider(...)`, and the provider builds `MessageWindowChatMemory` with `.id(memoryId).maxMessages(10).chatMemoryStore(fileChatMemoryStore)` for every session. Do not add `.chatMemory(...)` back: in LangChain4j 1.1.0 the provider replaces it. `MessageWindowChatMemory` in this version is stateless (it reads/writes the store on every `messages()` / `add()`), so once the provider is file-backed, history survives restarts and `ChatHistoryService` can read the same JSON files. Calls without `@MemoryId` share the `"default"` id.
 
 ### Guardrails
 
-`@InputGuardrails(SafeInputGuardrail.class)` on the `AiCodeHelperService` interface applies to *all* its methods, including `chatStream`. A blocked input aborts the request (an already-200 SSE stream just errors out). The guardrail deliberately does substring matching rather than `split("\\W+")` — Java's `\W` treats CJK as non-word chars, so word splitting never matches Chinese keywords.
+`@InputGuardrails(SafeInputGuardrail.class)` on the `AiCodeHelperService` interface applies to *all* its methods, including `chatStream`. A blocked input throws `InputGuardrailException` synchronously; `AiController` catches it (both around the call and via `onErrorResume`) and emits `{"type":"error","code":"GUARDRAIL_BLOCKED",...}` as an SSE frame instead of breaking the stream. The guardrail deliberately does substring matching rather than `split("\\W+")` — Java's `\W` treats CJK as non-word chars, so word splitting never matches Chinese keywords.
 
 ### RAG / tools / MCP
 
@@ -73,13 +79,24 @@ Bean wiring: the DashScope starter auto-configures `qwenChatModel` and `qwenStre
 
 ### SSE wire format (verified against the running app)
 
-Spring MVC streams `200 text/event-stream` (chunked) with bare `data:` lines separated by blank lines. The `event`/`id` fields the controller sets are **not** emitted by the MVC writer, and a token containing newlines arrives split across several `data:` lines that must be re-joined with `\n`. There is no heartbeat comment and no explicit terminal event — the stream simply ends.
+Spring MVC streams `200 text/event-stream` (chunked) with bare `data:` lines separated by blank lines. Each `data:` value is one compact JSON object:
+
+```text
+data:{"type":"delta","text":"Hi"}
+data:{"type":"done"}
+```
+
+- `delta` carries a text increment; a token containing newlines gets JSON-escaped (`\n`), so one frame still occupies one `data:` line.
+- `error` carries `code` + `message` and ends the turn (`GUARDRAIL_BLOCKED` / `MODEL_ERROR`).
+- `done` is the explicit terminal frame; `error` replaces it when generation fails.
+- The MVC writer does **not** emit `event:` / `id:` / comment lines, so don't rely on them. Response headers include `Cache-Control: no-cache` and `X-Accel-Buffering: no`; there is no heartbeat yet, so a long silent tool call can look idle to proxies.
 
 ## Frontend Architecture (`frontend/`)
 
-- A session id is generated on page load (`src/utils/session.js`, positive int because the backend's `memoryId` is an `int`), shown in the header; 「新会话」 regenerates it and clears the transcript.
-- SSE is consumed through axios' XHR adapter: `responseType: 'text'` + `onDownloadProgress` yields the *cumulative* `responseText`, which `src/api/chat.js` diffs into deltas before handing them to `src/api/sseParser.js` — an incremental frame parser that handles frames split across network chunks, CRLF, `: ping` comments and multi-line `data:`. `EventSource` is not used because the request needs custom params/abort handling; keep the XHR path in mind (axios' fetch adapter does not expose `responseText` this way).
-- `src/hooks/useChat.js` owns a turn: append user message + empty assistant message, patch the assistant message per chunk, `AbortController` for the 停止 button, error/aborted statuses.
+- The session id lives in `?session=<int>` and `localStorage` (`src/utils/session.js`), so a reload restores the transcript from `GET /ai/history`; 「新会话」 generates a new id (the old session's JSON file is left on disk) and clears the view.
+- SSE is consumed through axios' XHR adapter: `responseType: 'text'` + `onDownloadProgress` yields the *cumulative* `responseText`, which `src/api/chat.js` diffs into deltas before handing them to `src/api/sseParser.js` — an incremental frame parser that handles frames split across network chunks, CRLF, `: ping` comments and multi-line `data:`. Each frame's `data` is JSON-decoded into `delta` / `error` / `done`. `EventSource` is not used because the request is POST with a JSON body and needs custom abort handling; keep the XHR path in mind (axios' fetch adapter does not expose `responseText` this way).
+- `src/hooks/useChat.js` owns a turn: append user message + empty assistant message, patch the assistant message per `delta`, `AbortController` for the 停止 button, error/aborted statuses, and loads history when `sessionId` changes.
+- AI replies render through `src/components/MarkdownContent.jsx` (`react-markdown` + `remark-gfm` + `rehype-highlight`); fenced code blocks get a language label and copy button in `CodeBlock.jsx`. User messages stay plain text with `white-space: pre-wrap`.
 - Base URL is `/api` by default; set `VITE_API_BASE_URL` when the built app is served from a different origin than the backend.
 
 ## Repo Conventions / Misc

@@ -229,9 +229,12 @@ button {
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--panel);
-  white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+.bubble--markdown {
+  padding: 12px 16px;
 }
 
 .bubble-row--ai .bubble {
@@ -316,6 +319,169 @@ button {
   margin: 6px 2px 0;
   font-size: 12.5px;
   color: var(--text-dim);
+}
+
+/* ---------- Markdown 渲染 ---------- */
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p {
+  margin: 0.55em 0;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  margin: 1em 0 0.5em;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.markdown h1 {
+  font-size: 1.3em;
+}
+
+.markdown h2 {
+  font-size: 1.18em;
+}
+
+.markdown h3 {
+  font-size: 1.06em;
+}
+
+.markdown h4 {
+  font-size: 1em;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 0.55em 0;
+  padding-left: 1.5em;
+}
+
+.markdown li {
+  margin: 0.2em 0;
+}
+
+.markdown li > p {
+  margin: 0.2em 0;
+}
+
+.markdown a {
+  color: #7ea2ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown blockquote {
+  margin: 0.7em 0;
+  padding: 2px 12px;
+  border-left: 3px solid var(--accent);
+  background: rgba(79, 124, 255, 0.08);
+  color: var(--text-dim);
+}
+
+.markdown hr {
+  margin: 1em 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.markdown img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+.markdown table {
+  display: block;
+  max-width: 100%;
+  margin: 0.7em 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.markdown th,
+.markdown td {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.markdown th {
+  background: var(--panel-soft);
+  font-weight: 600;
+}
+
+.markdown :not(pre) > code {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+/* ---------- 代码块 ---------- */
+.code-block {
+  margin: 0.75em 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0b0e14;
+}
+
+.code-block__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 10px 5px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-soft);
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.code-block__lang {
+  text-transform: lowercase;
+  letter-spacing: 0.3px;
+}
+
+.code-block__copy {
+  padding: 2px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.code-block__copy:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  background: transparent;
+}
+
+.code-block pre code,
+.code-block .hljs {
+  padding: 0;
+  background: transparent;
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 /* ---------- 空状态 ---------- */
