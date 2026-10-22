@@ -1,20 +1,26 @@
 package com.example.zorincodehelper.ai;
 
 import com.example.zorincodehelper.ai.tools.TodayWeatherTool;
+//import dev.langchain4j.mcp.McpToolProvider;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+// AiCodeHelperService的构建类,Configuration会在Spring容器启动时被扫描到，自动创建AiCodeHelperService的Bean
 @Configuration
 public class AiCodeHelperServiceFactory {
 
     @Resource
     private ChatModel qwenChatModel;
+
+    @Resource
+    private StreamingChatModel qwenStreamingChatModel;
 
     @Resource
     private FileChatMemoryStore fileChatMemoryStore;
@@ -24,6 +30,9 @@ public class AiCodeHelperServiceFactory {
 
     @Resource
     private TodayWeatherTool todayWeatherTool;
+
+//    @Resource
+//    private McpToolProvider mcpToolProvider;
 
     @Bean
     public AiCodeHelperService aiCodeHelperService() {
@@ -37,11 +46,12 @@ public class AiCodeHelperServiceFactory {
                 .build();
         return AiServices.builder(AiCodeHelperService.class)
                 .chatModel(qwenChatModel)
+                .streamingChatModel(qwenStreamingChatModel) // 流式输出
                 .chatMemory(chatMemoryDefault)
-                // RAG检索增强生成
-//                .contentRetriever(contentRetriever)
-                // 注册工具，让大模型可以调用 getTodayWeather 等方法
-                .tools(todayWeatherTool)
+                .chatMemoryProvider(memoryId -> MessageWindowChatMemory.withMaxMessages(10)) // 每个会话独立存储
+                // .contentRetriever(contentRetriever) // RAG检索增强生成
+                .tools(todayWeatherTool) // 注册工具，让大模型可以调用 getTodayWeather 等方法
+//                .toolProvider(mcpToolProvider) // 注册MCP工具，让大模型可以调用MCP服务提供的工具
                 .build();
     }
 }

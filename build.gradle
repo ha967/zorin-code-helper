@@ -29,6 +29,7 @@ dependencies {
     implementation 'dev.langchain4j:langchain4j-community-dashscope-spring-boot-starter:1.1.0-beta7'
     implementation 'dev.langchain4j:langchain4j:1.1.0'
     implementation 'dev.langchain4j:langchain4j-mcp:1.1.0-beta7'
+    implementation 'dev.langchain4j:langchain4j-reactor:1.1.0-beta7'
     implementation 'org.jsoup:jsoup:1.20.1'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

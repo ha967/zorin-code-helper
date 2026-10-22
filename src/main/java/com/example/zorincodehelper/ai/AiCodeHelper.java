@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 // 函数式调用chat模型，使用系统消息和用户消息进行对话，并返回AI的响应文本。
+// 自己调用chatModel.chat方法，灵活性会比AiCodeHelperService + AiCodeHelperServiceFactory好一点
 @Service
 @Slf4j
 public class AiCodeHelper {
