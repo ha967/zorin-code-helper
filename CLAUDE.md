@@ -50,6 +50,7 @@ Start the backend first, then the frontend. The Vite dev server proxies `/api` t
 `AiController` exposes:
 
 - `POST /ai/chat` (body `{"memoryId": <int>, "message": "<string>"}`), returning `200 text/event-stream` with `Flux<String>` JSON frames;
+- `POST /ai/suggestions` (body `{"question": "<string>", "answer": "<string>"}`), returning `{"questions": ["...", "..."]}` — follow-up question chips for a finished turn (see below);
 - `GET /ai/history?memoryId=<int>` and `DELETE /ai/history?memoryId=<int>` for restoring / clearing a session.
 
 `CorsConfig` opens `/**` to all origins. `GlobalExceptionHandler` turns `IllegalArgumentException` into `400 {"code","message"}` for the non-streaming endpoints.
@@ -70,6 +71,12 @@ Bean wiring: the DashScope starter auto-configures `qwenChatModel` and `qwenStre
 ### Guardrails
 
 `@InputGuardrails(SafeInputGuardrail.class)` on the `AiCodeHelperService` interface applies to *all* its methods, including `chatStream`. A blocked input throws `InputGuardrailException` synchronously; `AiController` catches it (both around the call and via `onErrorResume`) and emits `{"type":"error","code":"GUARDRAIL_BLOCKED",...}` as an SSE frame instead of breaking the stream. The guardrail deliberately does substring matching rather than `split("\\W+")` — Java's `\W` treats CJK as non-word chars, so word splitting never matches Chinese keywords.
+
+### Follow-up suggestions
+
+`FollowUpSuggestionService` (built as a second `AiServices` proxy in `AiCodeHelperServiceFactory`) returns a structured-output record `Suggestions(List<String> questions)` and uses `follow-up-prompt.txt`. It deliberately has **no** `chatMemory` and no tools: it is a stateless side call over one question+answer pair, so it cannot pollute the main conversation or the memory window.
+
+It is a separate HTTP endpoint rather than an extra SSE frame so the answer stream still ends (and the composer re-enables) the moment generation finishes; the frontend fires `POST /ai/suggestions` afterwards and silently drops failures. The controller truncates the answer to 6000 chars and sanitizes model output (strip numbering/bullets, drop blanks/over-60-char items, dedupe, max 3). Only the latest assistant message renders suggestions, and clicking one sends it immediately.
 
 ### RAG / tools / MCP
 
@@ -95,7 +102,8 @@ data:{"type":"done"}
 
 - The session id lives in `?session=<int>` and `localStorage` (`src/utils/session.js`), so a reload restores the transcript from `GET /ai/history`; 「新会话」 generates a new id (the old session's JSON file is left on disk) and clears the view.
 - SSE is consumed through axios' XHR adapter: `responseType: 'text'` + `onDownloadProgress` yields the *cumulative* `responseText`, which `src/api/chat.js` diffs into deltas before handing them to `src/api/sseParser.js` — an incremental frame parser that handles frames split across network chunks, CRLF, `: ping` comments and multi-line `data:`. Each frame's `data` is JSON-decoded into `delta` / `error` / `done`. `EventSource` is not used because the request is POST with a JSON body and needs custom abort handling; keep the XHR path in mind (axios' fetch adapter does not expose `responseText` this way).
-- `src/hooks/useChat.js` owns a turn: append user message + empty assistant message, patch the assistant message per `delta`, `AbortController` for the 停止 button, error/aborted statuses, and loads history when `sessionId` changes.
+- `src/hooks/useChat.js` owns a turn: append user message + empty assistant message, patch the assistant message per `delta`, `AbortController` for the 停止 button, error/aborted statuses, and loads history when `sessionId` changes. When a turn ends normally it accumulates the full answer, calls `fetchSuggestions` (`POST /ai/suggestions`) and attaches the returned `questions` to that message; a separate `suggestionAbortRef` cancels the side request on new turns / session switches, and aborted or failed turns get no suggestions.
+- `MessageBubble` renders the chips (`.suggestion--chip`) only for the latest assistant message (`MessageList` computes it), so old turns never show stale suggestions; clicking a chip calls `send` directly.
 - AI replies render through `src/components/MarkdownContent.jsx` (`react-markdown` + `remark-gfm` + `rehype-highlight`); fenced code blocks get a language label and copy button in `CodeBlock.jsx`. User messages stay plain text with `white-space: pre-wrap`.
 - Base URL is `/api` by default; set `VITE_API_BASE_URL` when the built app is served from a different origin than the backend.
 

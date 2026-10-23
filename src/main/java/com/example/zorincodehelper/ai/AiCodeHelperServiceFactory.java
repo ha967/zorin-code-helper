@@ -51,4 +51,15 @@ public class AiCodeHelperServiceFactory {
 //                .toolProvider(mcpToolProvider) // 注册MCP工具，让大模型可以调用MCP服务提供的工具
                 .build();
     }
+
+    /**
+     * 追问建议服务：不挂 chatMemory、不挂工具，每次只根据传入的一轮问答独立生成。
+     * 复用同一个 qwenChatModel bean，不额外引入新的 ChatModel。
+     */
+    @Bean
+    public FollowUpSuggestionService followUpSuggestionService() {
+        return AiServices.builder(FollowUpSuggestionService.class)
+                .chatModel(qwenChatModel)
+                .build();
+    }
 }

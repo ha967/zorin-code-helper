@@ -7,10 +7,13 @@ const SUGGESTIONS = [
   '帮我 review 这段代码：List<User> list = new ArrayList<>()',
 ]
 
-export default function MessageList({ messages, onPickSuggestion }) {
+export default function MessageList({ messages, onPickSuggestion, onSendSuggestion }) {
   const scrollRef = useRef(null)
   // 用户往上翻看历史时不要强行把视图拽到底部
   const stickToBottomRef = useRef(true)
+
+  // 追问建议只挂在最新一条 AI 回答下面，避免历史消息里堆满过期的建议
+  const lastAssistantId = [...messages].reverse().find((m) => m.role === 'assistant')?.id
 
   useEffect(() => {
     const el = scrollRef.current
@@ -45,7 +48,14 @@ export default function MessageList({ messages, onPickSuggestion }) {
           </div>
         </div>
       ) : (
-        messages.map((message) => <MessageBubble key={message.id} message={message} />)
+        messages.map((message) => (
+          <MessageBubble
+            key={message.id}
+            message={message}
+            showSuggestions={message.id === lastAssistantId}
+            onSendSuggestion={onSendSuggestion}
+          />
+        ))
       )}
     </main>
   )

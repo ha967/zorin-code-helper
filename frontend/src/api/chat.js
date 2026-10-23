@@ -101,4 +101,13 @@ export async function fetchHistory(memoryId) {
   return data?.messages ?? []
 }
 
+/**
+ * 为一轮刚结束的问答生成追问建议（POST /api/ai/suggestions）。
+ * 这是旁路请求：失败时由调用方忽略，不显示建议即可。
+ */
+export async function fetchSuggestions({ question, answer, signal }) {
+  const { data } = await http.post('/ai/suggestions', { question, answer }, { signal })
+  return Array.isArray(data?.questions) ? data.questions : []
+}
+
 export default http

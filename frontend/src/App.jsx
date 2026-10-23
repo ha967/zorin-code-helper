@@ -37,7 +37,11 @@ export default function App() {
         onNewSession={handleNewSession}
       />
 
-      <MessageList messages={messages} onPickSuggestion={setDraft} />
+      <MessageList
+        messages={messages}
+        onPickSuggestion={setDraft}
+        onSendSuggestion={handleSend}
+      />
 
       <ChatInput
         value={draft}

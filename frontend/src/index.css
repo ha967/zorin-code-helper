@@ -535,6 +535,37 @@ button {
   transform: translateY(-1px);
 }
 
+/* ---------- 回答之后的追问建议 ---------- */
+.bubble-suggestions {
+  margin-top: 10px;
+}
+
+.bubble-suggestions__title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.bubble-suggestions__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.suggestion--chip {
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.suggestion--chip:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+
 /* ---------- 输入区 ---------- */
 .chat-input {
   padding: 12px 20px 10px;

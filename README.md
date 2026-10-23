@@ -17,6 +17,7 @@
 | RAG | 加载 `docs/` 下的文档，切分、向量化并检索 | [`RagConfig`](src/main/java/com/example/zorincodehelper/ai/rag/RagConfig.java) |
 | 输入拦截 | 敏感词命中时返回 `GUARDRAIL_BLOCKED` 错误帧 | [`SafeInputGuardrail`](src/main/java/com/example/zorincodehelper/ai/guardrail/SafeInputGuardrail.java) |
 | 结构化输出 | 让模型直接返回 Java `record` | [`AiCodeHelperService`](src/main/java/com/example/zorincodehelper/ai/AiCodeHelperService.java) |
+| 追问建议 | 每轮回答结束后生成 3 条可点击直接发送的后续问题 | [`FollowUpSuggestionService`](src/main/java/com/example/zorincodehelper/ai/FollowUpSuggestionService.java) |
 | Markdown 渲染 | GFM 表格、代码高亮、代码块一键复制 | [`MarkdownContent.jsx`](frontend/src/components/MarkdownContent.jsx) |
 
 ## 技术栈
@@ -36,6 +37,7 @@ zorin-code-helper/
 │  │  ├─ AiCodeHelperServiceFactory.java# 构建 AiServices 代理（记忆、工具等）
 │  │  ├─ FileChatMemoryStore.java       # 基于 JSON 文件的会话记忆存储
 │  │  ├─ ChatHistoryService.java        # 读取 / 清空会话历史
+│  │  ├─ FollowUpSuggestionService.java # 追问建议（无记忆的旁路 AI Service）
 │  │  ├─ guardrail/                     # 输入 Guardrail
 │  │  ├─ rag/RagConfig.java             # RAG 向量库与检索器
 │  │  ├─ tools/TodayWeatherTool.java    # 工具调用示例
@@ -45,6 +47,7 @@ zorin-code-helper/
 ├─ src/main/resources/
 │  ├─ application.yml                   # 端口 8081，context-path /api
 │  ├─ system-prompt.txt                 # 系统提示词
+│  ├─ follow-up-prompt.txt              # 追问建议提示词
 │  └─ docs/                             # RAG 知识库文档
 ├─ src/test/java/...                    # 测试（大部分会真实调用模型）
 ├─ frontend/                            # React 聊天页面
@@ -175,6 +178,29 @@ curl -N -X POST http://localhost:8081/api/ai/chat \
   -H "Accept: text/event-stream" \
   -d '{"memoryId":1,"message":"你好，介绍一下你自己"}'
 ```
+
+### 追问建议
+
+```http
+POST /api/ai/suggestions
+Content-Type: application/json
+
+{
+  "question": "ArrayList 和 LinkedList 有什么区别？",
+  "answer": "ArrayList 基于动态数组……LinkedList 基于双向链表……"
+}
+```
+
+```json
+{"questions": ["ArrayList 的扩容机制是怎样的？", "LinkedList 的 remove(Object) 为什么是 O(n)？"]}
+```
+
+前端在 `done` 帧之后自动调用这个接口，把建议挂到最后一条回答下面，点击即发送。
+
+- 这是独立于对话流的**旁路调用**：不读写会话记忆，也不会出现在历史记录里；
+- `answer` 超过 6000 字符会被截断，控制 token 消耗；
+- 模型输出会去掉序号 / 项目符号、去重、限 3 条、单条不超过 60 字符；
+- 生成失败返回 `{"questions":[]}` 而不是报错——没有建议不影响对话。
 
 ### 读取会话历史
 
