@@ -1,27 +1,52 @@
-export default function ChatHeader({ sessionId, onNewSession, isStreaming }) {
+import { Menu, Moon, Sun } from 'lucide-react';
+import { COPY } from '../content';
+
+export default function ChatHeader({
+  title,
+  sessionId,
+  isStreaming,
+  theme,
+  onToggleTheme,
+  onOpenSidebar,
+}) {
   return (
     <header className="chat-header">
-      <div className="chat-header__brand">
-        <div className="chat-header__logo" aria-hidden="true">
-          Z
-        </div>
-        <div className="chat-header__titles">
-          <h1>Zorin 编程助手</h1>
-          <p>
-            <span className={`status-dot ${isStreaming ? 'status-dot--busy' : ''}`} />
-            {isStreaming ? '正在思考…' : '在线，随时提问'}
-          </p>
-        </div>
+      <button
+        type="button"
+        className="icon-button chat-header__menu"
+        onClick={onOpenSidebar}
+        aria-label={COPY.openSidebar}
+      >
+        <Menu size={18} strokeWidth={1.8} />
+      </button>
+
+      <div className="chat-header__titles">
+        <h1 title={title}>{title}</h1>
+        <p className="chat-header__status">
+          <span className={`status-dot ${isStreaming ? 'status-dot--busy' : ''}`} />
+          <span>{isStreaming ? COPY.busy : COPY.online}</span>
+          <span className="chat-header__divider" aria-hidden="true" />
+          <span className="mono-meta">
+            {COPY.sessionLabel} #{sessionId}
+          </span>
+        </p>
       </div>
 
       <div className="chat-header__actions">
-        <span className="session-badge" title="当前会话 id（后端按它隔离会话记忆）">
-          会话 #{sessionId}
-        </span>
-        <button type="button" className="ghost-button" onClick={onNewSession}>
-          新会话
+        <button
+          type="button"
+          className="icon-button"
+          onClick={onToggleTheme}
+          aria-label={theme === 'light' ? COPY.themeToDark : COPY.themeToLight}
+          title={theme === 'light' ? COPY.themeToDark : COPY.themeToLight}
+        >
+          {theme === 'light' ? (
+            <Moon size={17} strokeWidth={1.8} />
+          ) : (
+            <Sun size={17} strokeWidth={1.8} />
+          )}
         </button>
       </div>
     </header>
-  )
+  );
 }

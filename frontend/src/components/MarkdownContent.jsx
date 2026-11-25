@@ -1,12 +1,12 @@
-import ReactMarkdown from 'react-markdown'
-import rehypeHighlight from 'rehype-highlight'
-import remarkGfm from 'remark-gfm'
-import CodeBlock from './CodeBlock'
-import 'highlight.js/styles/github-dark.css'
+import ReactMarkdown from 'react-markdown';
+import rehypeHighlight from 'rehype-highlight';
+import remarkGfm from 'remark-gfm';
+import CodeBlock from './CodeBlock';
 
 /**
  * AI 回复的 Markdown 渲染。
- * react-markdown 默认不渲染原始 HTML，所以不需要额外做 XSS 过滤。
+ * react-markdown 默认不渲染原始 HTML，所以不需要额外做 XSS 过滤；
+ * rehype-highlight 只处理代码文本，不会执行任何内容。
  */
 export default function MarkdownContent({ content }) {
   return (
@@ -24,5 +24,5 @@ export default function MarkdownContent({ content }) {
         {content}
       </ReactMarkdown>
     </div>
-  )
+  );
 }
